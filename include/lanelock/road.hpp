@@ -54,7 +54,7 @@ class Road {
   double curvatureAt(double s) const;
   Pose2D poseAt(double s) const;
 
-  /// Average absolute curvature over [s, s + horizon]; useful as a preview signal.
+  /// Mean signed curvature over [s, s + horizon]; used as a preview / feed-forward signal.
   double previewCurvature(double s, double horizon, int samples = 10) const;
 
   /// Maximum absolute curvature anywhere on the road.
