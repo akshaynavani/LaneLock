@@ -16,6 +16,7 @@ option(LANELOCK_BUILD_APPS "Build the lanelock_sim command-line tool" ON)
 add_library(lanelock_core
   src/road.cpp
   src/vehicle.cpp
+  src/noise.cpp
 )
 add_library(lanelock::core ALIAS lanelock_core)
 target_include_directories(lanelock_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
