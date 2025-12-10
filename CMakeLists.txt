@@ -21,6 +21,7 @@ add_library(lanelock_core
   src/actuator.cpp
   src/pid.cpp
   src/controller.cpp
+  src/metrics.cpp
 )
 add_library(lanelock::core ALIAS lanelock_core)
 target_include_directories(lanelock_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
