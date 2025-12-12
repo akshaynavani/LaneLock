@@ -24,6 +24,7 @@ add_library(lanelock_core
   src/metrics.cpp
   src/simulator.cpp
   src/scenario.cpp
+  src/io.cpp
 )
 add_library(lanelock::core ALIAS lanelock_core)
 target_include_directories(lanelock_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
