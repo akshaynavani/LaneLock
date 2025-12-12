@@ -59,7 +59,9 @@ LaneMeasurement LaneCamera::capture(double time, double dt, const VehicleState& 
   const double boundary = 0.5 * road.laneWidth();
   const bool lane_visible = std::abs(truth.e_y) < boundary + config_.max_detect_offset;
   const bool dropped = dropout_.dropped();
-  m.valid = lane_visible && !dropped;
+  const bool blackout = config_.blackout_duration > 0.0 && time >= config_.blackout_start &&
+                        time < config_.blackout_start + config_.blackout_duration;
+  m.valid = lane_visible && !dropped && !blackout;
   if (!m.valid) ++frames_dropped_;
   return m;
 }

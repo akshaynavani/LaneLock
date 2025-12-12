@@ -26,6 +26,9 @@ struct LaneCameraConfig {
   int dropout_burst_frames = 1;     // frames lost once a dropout starts
   /// The detector loses the lane when the vehicle is this far outside the lane boundary.
   double max_detect_offset = 3.0;   // m
+  /// Deterministic blackout window (e.g. tunnel exit glare, faded markings); duration 0 = off.
+  double blackout_start = 0.0;      // s
+  double blackout_duration = 0.0;   // s
   NoiseParams offset_noise{0.03, 0.0, 0.0, 0.0};
   NoiseParams heading_noise{0.002, 0.0, 0.0, 0.0};
   NoiseParams curvature_noise{1e-4, 0.0, 0.0, 0.0};
