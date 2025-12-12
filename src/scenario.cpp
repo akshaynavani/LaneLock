@@ -151,7 +151,13 @@ std::vector<Scenario> ScenarioLibrary::parametric() {
     for (double v : speeds()) {
       const Road road = makeRoad(geometry, v);
       // Gusts push towards the outside of the first curve (worst case); left on straights.
-      const double k_first = road.maxAbsCurvature() > 0.0 ? road.previewCurvature(3.0 * v, 400.0, 40) : 0.0;
+      double k_first = 0.0;
+      for (const auto& seg : road.segments()) {
+        if (seg.k_end != 0.0) {
+          k_first = seg.k_end;
+          break;
+        }
+      }
       const double gust_sign = k_first > 0.0 ? -1.0 : 1.0;
 
       for (const auto& quality : sensorQualities()) {
