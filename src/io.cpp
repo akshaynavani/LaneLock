@@ -1,5 +1,6 @@
 #include "lanelock/io.hpp"
 
+#include <algorithm>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
