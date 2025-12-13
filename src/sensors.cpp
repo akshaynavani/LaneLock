@@ -1,5 +1,6 @@
 #include "lanelock/sensors.hpp"
 
+#include <algorithm>
 #include <cmath>
 
 namespace lanelock {
@@ -14,6 +15,7 @@ enum Stream : std::uint64_t {
   kSpeed = 5,
   kYawRate = 6,
   kCamera = 7,
+  kCurvatureRate = 8,
 };
 constexpr double kTimeEps = 1e-9;
 }  // namespace
@@ -25,6 +27,7 @@ LaneCameraConfig LaneCameraConfig::ideal() {
   c.offset_noise = NoiseParams::none();
   c.heading_noise = NoiseParams::none();
   c.curvature_noise = NoiseParams::none();
+  c.curvature_rate_noise = NoiseParams::none();
   return c;
 }
 
@@ -43,6 +46,7 @@ LaneCamera::LaneCamera(LaneCameraConfig config, std::uint64_t seed)
       offset_noise_(config.offset_noise, deriveSeed(seed, kOffset)),
       heading_noise_(config.heading_noise, deriveSeed(seed, kHeading)),
       curvature_noise_(config.curvature_noise, deriveSeed(seed, kCurvature)),
+      curvature_rate_noise_(config.curvature_rate_noise, deriveSeed(seed, kCurvatureRate)),
       dropout_(config.dropout_probability, config.dropout_burst_frames, deriveSeed(seed, kDropout)) {}
 
 LaneMeasurement LaneCamera::capture(double time, double dt, const VehicleState& truth,
@@ -54,7 +58,13 @@ LaneMeasurement LaneCamera::capture(double time, double dt, const VehicleState& 
   // Noise processes evolve whether or not the frame survives.
   m.lateral_offset = offset_noise_.apply(truth.e_y, dt);
   m.heading_error = heading_noise_.apply(truth.e_psi, dt);
-  m.curvature = curvature_noise_.apply(road.previewCurvature(truth.s, config_.preview_distance), dt);
+  // Clothoid lane model fitted by the detector: curvature at the vehicle plus its rate of change
+  // over the preview range.
+  const double k_here = road.curvatureAt(truth.s);
+  const double range = std::max(config_.preview_distance, 1.0);
+  const double k_rate = (road.curvatureAt(truth.s + range) - k_here) / range;
+  m.curvature = curvature_noise_.apply(k_here, dt);
+  m.curvature_rate = curvature_rate_noise_.apply(k_rate, dt);
 
   const double boundary = 0.5 * road.laneWidth();
   const bool lane_visible = std::abs(truth.e_y) < boundary + config_.max_detect_offset;

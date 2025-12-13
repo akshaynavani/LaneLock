@@ -14,14 +14,15 @@ struct LaneMeasurement {
   double timestamp = 0.0;       // capture time, s
   double lateral_offset = 0.0;  // m, + = vehicle left of lane centre
   double heading_error = 0.0;   // rad, + = vehicle yawed left of lane tangent
-  double curvature = 0.0;       // 1/m, previewed lane curvature
+  double curvature = 0.0;       // 1/m, lane curvature at the vehicle (clothoid c2 term)
+  double curvature_rate = 0.0;  // 1/m^2, d(curvature)/ds over the preview range (c3 term)
   bool valid = false;
 };
 
 struct LaneCameraConfig {
   double rate_hz = 20.0;            // frame rate
   double latency = 0.05;            // s, capture-to-output delay
-  double preview_distance = 20.0;   // m, horizon over which curvature is estimated
+  double preview_distance = 30.0;   // m, range used to fit the curvature rate
   double dropout_probability = 0.0;  // per frame
   int dropout_burst_frames = 1;     // frames lost once a dropout starts
   /// The detector loses the lane when the vehicle is this far outside the lane boundary.
@@ -32,6 +33,7 @@ struct LaneCameraConfig {
   NoiseParams offset_noise{0.03, 0.0, 0.0, 0.0};
   NoiseParams heading_noise{0.002, 0.0, 0.0, 0.0};
   NoiseParams curvature_noise{1e-4, 0.0, 0.0, 0.0};
+  NoiseParams curvature_rate_noise{2e-6, 0.0, 0.0, 0.0};
 
   static LaneCameraConfig ideal();
 };
@@ -56,6 +58,7 @@ class LaneCamera {
   NoiseModel offset_noise_;
   NoiseModel heading_noise_;
   NoiseModel curvature_noise_;
+  NoiseModel curvature_rate_noise_;
   DropoutModel dropout_;
   std::deque<LaneMeasurement> pipeline_;  // frames in flight (latency buffer)
   LaneMeasurement output_;
