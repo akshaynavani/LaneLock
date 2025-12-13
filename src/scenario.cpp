@@ -59,17 +59,19 @@ Scenario baseScenario(double speed) {
   return sc;
 }
 
+/// Initial lane-relative state. Drift is specified as a lateral velocity (as in Euro NCAP lane
+/// support tests) and converted to a heading error for the scenario speed.
 struct InitialCondition {
   std::string name;
-  double offset;
-  double heading;
+  double offset;            // m
+  double lateral_velocity;  // m/s
 };
 
 const std::vector<InitialCondition>& initialConditions() {
   static const std::vector<InitialCondition> ics = {
       {"centered", 0.0, 0.0},
       {"offset_left", 0.5, 0.0},
-      {"drifting_right", -0.2, -0.015},
+      {"drifting_right", -0.2, -0.4},
   };
   return ics;
 }
@@ -131,8 +133,8 @@ SensorSuiteConfig ScenarioLibrary::makeSensors(const std::string& quality) {
     c.camera.latency = 0.10;
     c.camera.rate_hz = 15.0;
     c.camera.offset_noise = NoiseParams{0.08, 0.05, 0.01, 0.01};
-    c.camera.heading_noise = NoiseParams{0.006, 0.0, 0.0005, 0.0};
-    c.camera.curvature_noise = NoiseParams{3e-4, 0.0, 0.0, 0.0};
+    c.camera.heading_noise = NoiseParams{0.006, 0.001, 0.0, 0.0};  // 0.06 deg mount misalignment
+    c.camera.curvature_noise = NoiseParams{1.5e-4, 0.0, 0.0, 0.0};
     c.camera.dropout_probability = 0.05;
     c.camera.dropout_burst_frames = 4;
     c.speed_noise = NoiseParams{0.2, 0.1, 0.0, 0.0};
@@ -168,7 +170,7 @@ std::vector<Scenario> ScenarioLibrary::parametric() {
             sc.category = geometry;
             sc.sensors = makeSensors(quality);
             sc.initial_offset = ic.offset;
-            sc.initial_heading = ic.heading;
+            sc.initial_heading = std::asin(clamp(ic.lateral_velocity / v, -0.5, 0.5));
             if (gust) sc.disturbances.push_back({kGustStart, 0.3, 1.5, gust_sign * kGustForce});
             sc.seed = deriveSeed(kLibrarySeed, index++);
             sc.tags = {geometry, speedLabel(v), quality, ic.name, gust ? "gust" : "calm"};
