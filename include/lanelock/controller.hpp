@@ -21,6 +21,7 @@ struct ControllerDebug {
   double est_offset = 0.0;
   double est_heading = 0.0;
   double est_curvature = 0.0;
+  double ff_curvature = 0.0;
   double lookahead_error = 0.0;
   double feedforward = 0.0;
   double feedback = 0.0;
@@ -42,7 +43,7 @@ class LateralController {
 struct PidLaneKeepingConfig {
   // Desired closed-loop behaviour of the lateral error dynamics; PID gains are derived from
   // these and re-scheduled with speed every step.
-  double natural_frequency = 1.2;  // rad/s
+  double natural_frequency = 1.8;  // rad/s
   double damping_ratio = 0.9;
   double ki_ratio = 0.15;          // ki = kp * ki_ratio  [1/s]
   double kd_time = 0.10;           // kd = kp * kd_time   [s]
@@ -60,6 +61,15 @@ struct PidLaneKeepingConfig {
   /// to the feed-forward and removes the expected sideslip from the heading error. Enable when
   /// the plant has tyre slip (dynamic model / real car); disable for a kinematic plant.
   bool compensate_understeer = true;
+  /// Observer correction gains applied when a new camera frame arrives (1 = trust the camera
+  /// fully, smaller values blend it with the yaw-rate dead-reckoned prediction).
+  double offset_correction_gain = 0.7;
+  double heading_correction_gain = 0.5;
+  /// Low-pass time constant on the camera curvature used for feed-forward / dead reckoning.
+  double curvature_filter_tau = 0.3;  // s
+  /// The feed-forward uses the curvature this far ahead (s at current speed) to cover actuator
+  /// and vehicle yaw-response lag. The filter lag is compensated on top of this.
+  double feedforward_preview_time = 0.4;  // s
   double hold_timeout = 1.0;       // s of dead reckoning before going Unavailable
   double stale_after = 0.25;       // s without a new valid frame before switching to Holding
 };
@@ -94,6 +104,8 @@ class PidLaneKeepingController : public LateralController {
 
  private:
   void updateEstimate(const SensorFrame& frame, double dt);
+  /// Filtered clothoid model evaluated `time_ahead` seconds ahead of the latest frame.
+  double curvatureAhead(double v, double time_ahead) const;
 
   PidLaneKeepingConfig config_;
   VehicleParams vehicle_;
@@ -106,7 +118,9 @@ class PidLaneKeepingController : public LateralController {
   double last_valid_time_ = -1e9;
   double est_offset_ = 0.0;
   double est_heading_ = 0.0;
-  double est_curvature_ = 0.0;
+  double est_curvature_ = 0.0;       // at the vehicle, now
+  LowPassFilter curvature_filter_;
+  LowPassFilter curvature_rate_filter_;
 };
 
 }  // namespace lanelock
