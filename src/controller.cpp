@@ -19,7 +19,8 @@ const char* toString(ControllerMode mode) {
 
 PidLaneKeepingController::PidLaneKeepingController(PidLaneKeepingConfig config,
                                                    VehicleParams vehicle)
-    : config_(config), vehicle_(vehicle) {
+    : config_(config), vehicle_(vehicle), curvature_filter_(config.curvature_filter_tau),
+      curvature_rate_filter_(config.curvature_filter_tau) {
   PidLimits limits;
   limits.output_min = -config_.max_steer;
   limits.output_max = config_.max_steer;
@@ -36,6 +37,16 @@ void PidLaneKeepingController::reset() {
   last_frame_timestamp_ = -1.0;
   last_valid_time_ = -1e9;
   est_offset_ = est_heading_ = est_curvature_ = 0.0;
+  curvature_filter_.reset();
+  curvature_rate_filter_.reset();
+}
+
+double PidLaneKeepingController::curvatureAhead(double v, double time_ahead) const {
+  // The low-pass filters delay the clothoid by ~tau; look that much further ahead to undo it.
+  // Extrapolation is limited to the look-ahead range so a stale clothoid can't run away.
+  const double distance =
+      std::min(v * (std::max(time_ahead, 0.0) + config_.curvature_filter_tau), config_.max_lookahead);
+  return curvature_filter_.value() + curvature_rate_filter_.value() * distance;
 }
 
 PidGains PidLaneKeepingController::scheduledGains(double v) const {
@@ -81,17 +92,35 @@ void PidLaneKeepingController::updateEstimate(const SensorFrame& frame, double d
 
   const LaneMeasurement& lane = frame.lane;
   const bool new_frame = lane.valid && lane.timestamp > last_frame_timestamp_;
-  if (new_frame) {
-    last_frame_timestamp_ = lane.timestamp;
-    last_valid_time_ = lane.timestamp;
-    est_offset_ = lane.lateral_offset;
-    est_heading_ = lane.heading_error;
-    est_curvature_ = lane.curvature;
-    have_estimate_ = true;
-    if (config_.use_latency_compensation) propagate(frame.time - lane.timestamp);
-  } else if (have_estimate_) {
-    propagate(dt);
+  if (have_estimate_) {
+    est_curvature_ = curvatureAhead(v, frame.time - last_frame_timestamp_);
+    propagate(dt);  // predict to the current time
   }
+  if (!new_frame) return;
+
+  // The frame describes the vehicle at capture time; bring it forward to now using the same
+  // kinematics so it can be compared with the prediction.
+  const double frame_dt = std::max(lane.timestamp - last_frame_timestamp_, dt);
+  // After a long outage the dead-reckoned prediction is worthless: re-initialise from the camera.
+  const bool trust_prediction = have_estimate_ && (lane.timestamp - last_valid_time_) <= config_.hold_timeout;
+  last_frame_timestamp_ = lane.timestamp;
+  last_valid_time_ = lane.timestamp;
+  curvature_filter_.update(lane.curvature, frame_dt);
+  curvature_rate_filter_.update(lane.curvature_rate, frame_dt);
+
+  const double pred_offset = est_offset_;
+  const double pred_heading = est_heading_;
+  est_offset_ = lane.lateral_offset;
+  est_heading_ = lane.heading_error;
+  est_curvature_ = curvatureAhead(v, frame.time - lane.timestamp);
+  if (config_.use_latency_compensation) propagate(frame.time - lane.timestamp);
+
+  if (trust_prediction) {
+    // Correction step of a fixed-gain observer: blend measurement with the prediction.
+    est_offset_ = pred_offset + config_.offset_correction_gain * (est_offset_ - pred_offset);
+    est_heading_ = pred_heading + config_.heading_correction_gain * (est_heading_ - pred_heading);
+  }
+  have_estimate_ = true;
 }
 
 double PidLaneKeepingController::computeSteering(const SensorFrame& frame, double dt) {
@@ -112,10 +141,13 @@ double PidLaneKeepingController::computeSteering(const SensorFrame& frame, doubl
     pid_.reset();  // bumpless re-engagement: no stale integral or derivative history
   }
 
-  const double ff = feedforwardSteer(est_curvature_, v);
+  const double ff_curvature =
+      curvatureAhead(v, frame.time - last_frame_timestamp_ + config_.feedforward_preview_time);
+  const double ff = have_estimate_ ? feedforwardSteer(ff_curvature, v) : 0.0;
   debug_.est_offset = est_offset_;
   debug_.est_heading = est_heading_;
   debug_.est_curvature = est_curvature_;
+  debug_.ff_curvature = ff_curvature;
   debug_.feedforward = ff;
 
   if (mode_ == ControllerMode::Unavailable) {
