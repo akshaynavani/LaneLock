@@ -40,3 +40,8 @@ if(LANELOCK_BUILD_APPS)
   add_executable(lanelock_sim apps/lanelock_sim.cpp)
   target_link_libraries(lanelock_sim PRIVATE lanelock::core Threads::Threads)
 endif()
+
+if(LANELOCK_BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(tests)
+endif()
