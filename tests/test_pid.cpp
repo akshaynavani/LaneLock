@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cmath>
+
 #include "lanelock/pid.hpp"
 
 using namespace lanelock;
