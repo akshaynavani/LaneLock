@@ -1,0 +1,45 @@
+# Build trees
+build/
+build-*/
+cmake-build-*/
+out/
+_deps/
+
+# CMake generated files (in-source builds)
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
+Makefile
+compile_commands.json
+
+# Compiled objects and binaries
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+lanelock_sim
+lanelock_unit_tests
+lanelock_regression_tests
+
+# Simulation outputs (baselines/ is tracked on purpose)
+*.trace.csv
+trace*.csv
+summary*.csv
+suite_summary.csv
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Local environment
+.env
