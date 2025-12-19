@@ -38,7 +38,11 @@ TEST(Noise, SameSeedGivesIdenticalSequence) {
   NoiseParams p{0.1, 0.0, 0.01, 0.0};
   NoiseModel a(p, 42);
   NoiseModel b(p, 42);
-  for (int i = 0; i < 100; ++i) EXPECT_DOUBLE_EQ(a.apply(1.0, 0.01), b.apply(1.0, 0.01));
+  for (int i = 0; i < 100; ++i) {
+    const double va = a.apply(1.0, 0.01);
+    const double vb = b.apply(1.0, 0.01);
+    EXPECT_DOUBLE_EQ(va, vb);
+  }
 }
 
 TEST(Noise, DifferentSeedsDiffer) {
@@ -46,7 +50,11 @@ TEST(Noise, DifferentSeedsDiffer) {
   NoiseModel a(p, 1);
   NoiseModel b(p, 2);
   int equal = 0;
-  for (int i = 0; i < 100; ++i) equal += a.apply(0.0, 0.01) == b.apply(0.0, 0.01);
+  for (int i = 0; i < 100; ++i) {
+    const double va = a.apply(0.0, 0.01);
+    const double vb = b.apply(0.0, 0.01);
+    equal += va == vb ? 1 : 0;
+  }
   EXPECT_LT(equal, 5);
 }
 
