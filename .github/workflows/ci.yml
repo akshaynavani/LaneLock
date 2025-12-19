@@ -1,0 +1,38 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        build_type: [Release, Debug]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Unit and regression tests
+        run: ctest --test-dir build --output-on-failure --parallel 4
+
+      - name: Scenario suite summary
+        if: matrix.build_type == 'Release'
+        run: |
+          ./build/lanelock_sim suite --summary suite_summary.csv \
+            --baseline baselines/metrics_baseline.csv
+
+      - name: Upload suite summary
+        if: matrix.build_type == 'Release' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: suite-summary-${{ matrix.os }}
+          path: suite_summary.csv
